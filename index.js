@@ -427,7 +427,7 @@ function addHouse() {
 }
 
 function addForest(object) {
-	addBox(0, -2, 0, 250, 1, 250, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x2C7045, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
+	addBox(0, -2, 0, 250, 1, 250, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x0e361c, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
 	const mapWidth = 250;
 	const mapDepth = 250;
 	const treeDensity = 0.2;
@@ -533,14 +533,15 @@ function setupGraphics() {
 	createPlayer();
 
 	//create lights
-	let light1 = new THREE.AmbientLight(0x222244, 1);
+	let light1 = new THREE.AmbientLight(0x222244, 2);
 
-	let light2 = new THREE.DirectionalLight(0xDDDDFF, 1);
+	let light2 = new THREE.DirectionalLight(0xDDDDFF, 4);
 	light2.position.set(300, 200, -100);
 	light2.castShadow = true;
+
 	//the shadows still look bad :-(
-	light2.shadow.mapSize.width = 500 * 10240000;
-	light2.shadow.mapSize.height = 200 * 10240000;
+	light2.shadow.mapSize.width = 500 * 102400;
+	light2.shadow.mapSize.height = 200 * 102400;
 	light2.shadow.camera.near = 0.5; // default
 	light2.shadow.camera.far = 600; // default
 	light2.shadow.camera.left = -250;
