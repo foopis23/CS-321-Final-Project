@@ -60,6 +60,7 @@ class FirstPersonControls {
 
 		this.lat = 0;
 		this.lon = 0;
+		this.fly = false;
 
 		this.lookDirection = new THREE.Vector3();
 		this.spherical = new THREE.Spherical();
@@ -162,6 +163,10 @@ class FirstPersonControls {
 			case 39: /*right*/
 			case 68: /*D*/ this.moveRight = false; break;
 
+
+			//toggle stuff
+			case 219: /*[*/ toggleFlatShading(); break;
+			case 221: /*]*/ toggleWireframe(); break;
 		}
 	}
 
@@ -191,17 +196,21 @@ class FirstPersonControls {
 
 		velocity.setX(0);
 		velocity.setZ(0);
+		if (this.fly) velocity.setY(0);
 		angularVelocity.setY(0);
 
 		if (this.moveForward || (this.autoForward && !this.moveBackward)) {
 			velocity.setZ(this.movementSpeed * lookAtVector.z);
 			velocity.setX(this.movementSpeed * lookAtVector.x);
+			if (this.fly) velocity.setY(this.movementSpeed * lookAtVector.y)
 		}
 
 		if (this.moveBackward) {
 			velocity.setZ(-this.movementSpeed * lookAtVector.z);
 			velocity.setX(-this.movementSpeed * lookAtVector.x);
 		}
+
+	
 
 		// if ( this.moveLeft ) {
 		// 	velocity.setZ(this.movementSpeed * lookAtVector.x);
@@ -271,9 +280,9 @@ class FirstPersonControls {
 		this.lon = THREE.MathUtils.radToDeg(this.spherical.theta);
 	}
 
-	teleport() {
+	teleport(x, y, z) {
 		let transform = this.player.userData.physicsBody.getWorldTransform();
-		transform.setOrigin(new Ammo.btVector3(0, -90, -10));
+		transform.setOrigin(new Ammo.btVector3(x, y, z));
 	}
 
 	relTelport(x, y, z) {
@@ -288,7 +297,7 @@ class FirstPersonControls {
 
 
 function createPlayer() {
-	let pos = { x: 0, y: 20, z: 0 };
+	let pos = { x: 0, y: 0, z: 0 };
 	let radius = 1.5;
 	let quat = { x: 0, y: 0, z: 0, w: 1 };
 	let mass = 1;
@@ -301,12 +310,12 @@ function createPlayer() {
 	let far = 500;
 	camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	playerWrapper.add(camera);
-	camera.position.set(0, 0, 0);
 	playerWrapper.position.set(pos.x, pos.y, pos.z);
 	playerWrapper.updateMatrixWorld();
 	controls = new FirstPersonControls(playerWrapper, camera, canvasElement);
 	controls.movementSpeed = 5;
 	controls.lookSpeed = 10;
+	controls.lookAt(0, 0, -10);
 	scene.add(playerWrapper);
 
 	//Ammojs Section
@@ -405,7 +414,7 @@ function addHouse() {
 	const depth = 10;
 	const z = -10;
 	const x = 0;
-	const material = new THREE.MeshPhongMaterial({color: 0x5F443E})
+	const material = new THREE.MeshPhongMaterial({color: 0x5F443E});
 
 	//backWall
 	addBox(x, 0, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
@@ -423,24 +432,24 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 	addBox(x, height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
-	addBox(x, -height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({color: 0x2C7045, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, true)
+	addBox(x, -92, z, width, height, 0.5, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, true)
 }
 
 function addForest(object) {
-	addBox(0, -2, 0, 250, 1, 250, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x0e361c, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
-	const mapWidth = 250;
-	const mapDepth = 250;
-	const treeDensity = 0.2;
+	const mapWidth = 100;
+	const mapDepth = 100;
+	const treeDensity = 0.25;
 	const posVariation = 1;
 	const scaleVariation = 0.2;
 	const trunkVariation = 0.1;
-	const treeDistance = 3;
+	const treeDistance = 2.6;
+	addBox(0, -2, 0, mapWidth, 1, mapDepth, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
 
 	let mapWidthH = mapWidth / 2;
 	let mapDepthH = mapDepth / 2;
 	for (let x = -mapWidthH; x < mapWidthH; x += treeDistance) {
 		for (let z = -mapDepthH; z < mapDepthH; z += treeDistance) {
-			if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
+			if (Math.abs(x) < 11 && z < 5 && z > -20) continue;
 
 			if (Math.random() < treeDensity) {
 				//threejs stuff
@@ -468,7 +477,7 @@ function addForest(object) {
 				transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
 				let motionState = new Ammo.btDefaultMotionState(transform);
 
-				let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5 * 2, scale.y * 0.5 * 4, scale.z * 0.5 * 2));
+				let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5 * 2, scale.y * 0.5 * 6, scale.z * 0.5 * 2));
 				colShape.setMargin(0.05);
 
 				let localInertia = new Ammo.btVector3(0, 0, 0);
@@ -526,12 +535,6 @@ function setupGraphics() {
 		});
 	});
 
-	//create a little building
-	addHouse();
-
-	//create playable character
-	createPlayer();
-
 	//create lights
 	let light1 = new THREE.AmbientLight(0x222244, 2);
 
@@ -548,13 +551,20 @@ function setupGraphics() {
 	light2.shadow.camera.right = 250;
 	light2.shadow.camera.bottom = -100;
 	light2.shadow.camera.top = 100;
-
+	scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({color: 0xffff00})));
 	scene.add(light1);
 	scene.add(light2);
+
+	//create a little building
+	addHouse();
+
+	//create playable character
+	createPlayer();
+
 	let skycolor = new THREE.Color(0xAA9999);
 	scene.background = skycolor;
 	let fogcolor = new THREE.Color(0xAAAAAA);
-	scene.fog = new THREE.FogExp2(fogcolor, 0.01);
+	scene.fog = new THREE.FogExp2(fogcolor, 0.03);
 
 	clock = new THREE.Clock();
 }
@@ -620,4 +630,41 @@ function loop() {
 	update(deltaTime);
 	render();
 }
+
+function toggleMaterialSetting(key) {
+	let materialsSwitched = {};
+	
+	scene.children.forEach((child) => {
+		switch(child.type) {
+			case "Mesh":
+				if (!materialsSwitched[child.material.uuid]) {
+					child.material[key] = !child.material[key];
+					child.material.needsUpdate = true;
+					materialsSwitched[child.material.uuid] = true;
+				}
+				
+				break;
+			case "Group": //handles duplicated trees
+				if (!materialsSwitched[child.children[0].material[0].uuid] || !materialsSwitched[child.children[0].material[1].uuid]) {
+					child.children[0].material[0][key] = !child.children[0].material[0][key];
+					child.children[0].material[0].needsUpdate = true;
+					materialsSwitched[child.children[0].material[0].uuid] = true;
+					
+					child.children[0].material[1][key] = !child.children[0].material[1][key];
+					child.children[0].material[1].needsUpdate = true;
+					materialsSwitched[child.children[0].material[1].uuid] = true;
+				}
+				break;
+		}
+	});
+}
+
+function toggleFlatShading() {
+	toggleMaterialSetting('flatShading');
+}
+
+function toggleWireframe() {
+	toggleMaterialSetting('wireframe');
+}
+
 Ammo().then(initScene);
