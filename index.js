@@ -2,6 +2,8 @@ const π = Math.PI;
 
 var scene, rootElement, canvasElement, renderer, camera, controls, clock, physicsWorld, rigidBodies = [], tmpTrans, treeMaterials = [];
 
+var loading = true;
+
 function bind(scope, fn) {
 
 	return function () {
@@ -89,7 +91,7 @@ class FirstPersonControls {
 	}
 
 	onLockChangeAlert() {
-		
+
 
 		if (document.pointerLockElement === this.domElement ||
 			document.mozPointerLockElement === this.domElement) {
@@ -116,17 +118,6 @@ class FirstPersonControls {
 	onMouseMove(event) {
 		this.mouseX += event.movementX;
 		this.mouseY += event.movementY;
-
-		// if (this.domElement === document) {
-
-		// 	this.mouseX = event.pageX - this.viewHalfX;
-		// 	this.mouseY = event.pageY - this.viewHalfY;
-
-		// } else {
-
-		// 	this.mouseX = event.pageX - this.domElement.offsetLeft - this.viewHalfX;
-		// 	this.mouseY = event.pageY - this.domElement.offsetTop - this.viewHalfY;
-		// }
 	}
 
 	onMouseDown(event) {
@@ -139,7 +130,6 @@ class FirstPersonControls {
 	}
 
 	onKeyDown(event) {
-		console.log("test");
 		switch (event.keyCode) {
 
 			case 38: /*up*/
@@ -280,31 +270,22 @@ class FirstPersonControls {
 		this.lat = 90 - THREE.MathUtils.radToDeg(this.spherical.phi);
 		this.lon = THREE.MathUtils.radToDeg(this.spherical.theta);
 	}
+
+	teleport() {
+		let transform = this.player.userData.physicsBody.getWorldTransform();
+		transform.setOrigin(new Ammo.btVector3(0, -90, -10));
+	}
+
+	relTelport(x, y, z) {
+		let transform = this.player.userData.physicsBody.getWorldTransform();
+		let newX = this.player.position.x + x;
+		let newY = this.player.position.y + y;
+		let newZ = this.player.position.z + z;
+		transform.setOrigin(new Ammo.btVector3(newX, newY, newZ));
+	}
 }
 
 
-function ToEulerAngles(q) {
-	let angles = { x: 0, y: 0, z: 0 };
-
-	// roll (x-axis rotation)
-	let sinr_cosp = 2 * (q.w() * q.x() + q.y() * q.z());
-	let cosr_cosp = 1 - 2 * (q.x() * q.x() + q.y() * q.y());
-	angles.x = Math.atan2(sinr_cosp, cosr_cosp);
-
-	// pitch (y-axis rotation)
-	let sinp = 2 * (q.w() * q.y() - q.z() * q.x());
-	if (Math.abs(sinp) >= 1)
-		angles.y = (M_PI / 2) * Math.sign(sinp); // use 90 degrees if out of range
-	else
-		angles.y = Math.asin(sinp);
-
-	// yaw (z-axis rotation)
-	let siny_cosp = 2 * (q.w() * q.z() + q.x() * q.y());
-	let cosy_cosp = 1 - 2 * (q.y() * q.y() + q.z() * q.z());
-	angles.z = Math.atan2(siny_cosp, cosy_cosp);
-
-	return angles;
-}
 
 function createPlayer() {
 	let pos = { x: 0, y: 20, z: 0 };
@@ -352,25 +333,7 @@ function createPlayer() {
 	rigidBodies.push(playerWrapper);
 }
 
-function createFloor() {
-	let pos = { x: 0, y: -2, z: 0 };
-	let scale = { x: 250, y: 1, z: 250 };
-	let quat = { x: 0, y: 0, z: 0, w: 1 };
-	let mass = 0;
-
-	//threeJS Section
-	let blockPlane = new THREE.Mesh(new THREE.BoxBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0x999999 }));
-
-	blockPlane.position.set(pos.x, pos.y, pos.z);
-	blockPlane.scale.set(scale.x, scale.y, scale.z);
-
-	blockPlane.castShadow = true;
-	blockPlane.receiveShadow = true;
-
-	scene.add(blockPlane);
-
-
-	//Ammojs Section
+function createRectCollider(pos, scale, quat, mass) {
 	let transform = new Ammo.btTransform();
 	transform.setIdentity();
 	transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
@@ -386,11 +349,85 @@ function createFloor() {
 	let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
 	let body = new Ammo.btRigidBody(rbInfo);
 
+	return body;
+}
 
+function createBox(x, y, z, width, height, depth, rotX, rotY, rotZ, material, mass) {
+	let pos = { x: x, y: y, z: z };
+	let scale = { x: width, y: height, z: depth };
+
+	let mesh = new THREE.Mesh(new THREE.BoxBufferGeometry(), material);
+	mesh.position.set(x, y, z);
+	mesh.scale.set(width, height, depth);
+	mesh.rotation.set(rotX, rotY, rotZ);
+
+	let quat = { x: mesh.quaternion.x, y: mesh.quaternion.y, z: mesh.quaternion.z, w: mesh.quaternion.w };
+
+	let body = createRectCollider(pos, scale, quat, mass);
+
+	return { mesh, body };
+}
+
+function addBox(x, y, z, width, height, depth, rotX, rotY, rotZ, material, mass, receiveShadow, castShadow) {
+	let res = createBox(x, y, z, width, height, depth, rotX, rotY, rotZ, material, mass);
+	res.mesh.receiveShadow = receiveShadow;
+	res.mesh.castShadow = castShadow;
+	scene.add(res.mesh);
+	physicsWorld.addRigidBody(res.body);
+}
+
+function createHouseWall(x, y, z, width, height, rotX, rotY, color) {
+	let pos = { x: x, y: y, z: z };
+	let scale = { x: width, y: height, z: 1 };
+	let mass = 0;
+
+	let blockPlane = new THREE.Mesh(new THREE.BoxBufferGeometry(), new THREE.MeshPhongMaterial({ color }));
+
+	blockPlane.position.set(pos.x, pos.y, pos.z);
+	blockPlane.scale.set(scale.x, scale.y, scale.z);
+	blockPlane.rotation.set(rotX, rotY, 0);
+
+	let quat = { x: blockPlane.quaternion.x, y: blockPlane.quaternion.y, z: blockPlane.quaternion.z, w: blockPlane.quaternion.w };
+
+	blockPlane.castShadow = true;
+	blockPlane.receiveShadow = true;
+
+	scene.add(blockPlane);
+
+	//Add Collider
+	let body = createRectCollider(pos, scale, quat, mass);
 	physicsWorld.addRigidBody(body);
 }
 
-function generateTrees(object) {
+function addHouse() {
+	const width = 10;
+	const height = 10;
+	const depth = 10;
+	const z = -10;
+	const x = 0;
+	const material = new THREE.MeshPhongMaterial({color: 0x5F443E})
+
+	//backWall
+	addBox(x, 0, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
+	addBox(x, -90, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
+
+	//left sidewall
+	addBox(x - width / 2, 0, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x - width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+
+	//right sidwall
+	addBox(x + width / 2, 0, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x + width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+
+	//roof
+	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
+	addBox(x, height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
+
+	addBox(x, -height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({color: 0x2C7045, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, true)
+}
+
+function addForest(object) {
+	addBox(0, -2, 0, 250, 1, 250, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x2C7045, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
 	const mapWidth = 250;
 	const mapDepth = 250;
 	const treeDensity = 0.2;
@@ -399,11 +436,11 @@ function generateTrees(object) {
 	const trunkVariation = 0.1;
 	const treeDistance = 3;
 
-	let mapWidthH = mapWidth/2;
-	let mapDepthH = mapDepth/2;
+	let mapWidthH = mapWidth / 2;
+	let mapDepthH = mapDepth / 2;
 	for (let x = -mapWidthH; x < mapWidthH; x += treeDistance) {
 		for (let z = -mapDepthH; z < mapDepthH; z += treeDistance) {
-			if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
+			if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
 
 			if (Math.random() < treeDensity) {
 				//threejs stuff
@@ -412,7 +449,7 @@ function generateTrees(object) {
 				let posX = x + Math.random() * (posVariation * 2) - posVariation;
 				let posY = -2 + Math.random() * (trunkVariation * 2) - trunkVariation
 				let posZ = z + Math.random() * (posVariation * 2) - posVariation;
-				
+
 				let scaleY = scaleVariation + Math.random() * (scaleVariation * 2) - scaleVariation;
 
 				let pos = { x: posX, y: posY, z: posZ };
@@ -430,16 +467,16 @@ function generateTrees(object) {
 				transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
 				transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
 				let motionState = new Ammo.btDefaultMotionState(transform);
-			
+
 				let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5 * 2, scale.y * 0.5 * 4, scale.z * 0.5 * 2));
 				colShape.setMargin(0.05);
-			
+
 				let localInertia = new Ammo.btVector3(0, 0, 0);
 				colShape.calculateLocalInertia(mass, localInertia);
-			
+
 				let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
 				let body = new Ammo.btRigidBody(rbInfo);
-			
+
 				physicsWorld.addRigidBody(body);
 			}
 		}
@@ -466,28 +503,6 @@ function setupGraphics() {
 
 	//create scene
 	scene = new THREE.Scene();
-	scene.background = new THREE.Color(0xAA9999);
-
-	//create lights
-	let light1 = new THREE.AmbientLight(0xAA9999, 1);
-
-	let light2 = new THREE.DirectionalLight(0xCCCCCC, 0.5);
-	light2.position.set(300, 200, 0);
-	light2.castShadow = true;
-	light2.shadow.mapSize.width = 10240;
-	light2.shadow.mapSize.height = 10240;
-	light2.shadow.camera.near = 0.5; // default
-	light2.shadow.camera.far = 600; // default
-	light2.shadow.camera.left = -250;
-	light2.shadow.camera.right = 250;
-	light2.shadow.camera.bottom = -250;
-	light2.shadow.camera.top = 250;
-
-	//create playable character
-	createPlayer();
-
-	//create floor
-	createFloor();
 
 	//load custom modeled obj
 	let mloader = new THREE.MTLLoader();
@@ -506,13 +521,39 @@ function setupGraphics() {
 				child.receiveShadow = true;
 			})
 
-			generateTrees(object);
+			addForest(object);
+			loading = false;
 		});
 	});
 
-	//add all objects to the scene
+	//create a little building
+	addHouse();
+
+	//create playable character
+	createPlayer();
+
+	//create lights
+	let light1 = new THREE.AmbientLight(0x222244, 1);
+
+	let light2 = new THREE.DirectionalLight(0xDDDDFF, 1);
+	light2.position.set(300, 200, -100);
+	light2.castShadow = true;
+	//the shadows still look bad :-(
+	light2.shadow.mapSize.width = 500 * 10240000;
+	light2.shadow.mapSize.height = 200 * 10240000;
+	light2.shadow.camera.near = 0.5; // default
+	light2.shadow.camera.far = 600; // default
+	light2.shadow.camera.left = -250;
+	light2.shadow.camera.right = 250;
+	light2.shadow.camera.bottom = -100;
+	light2.shadow.camera.top = 100;
+
 	scene.add(light1);
 	scene.add(light2);
+	let skycolor = new THREE.Color(0xAA9999);
+	scene.background = skycolor;
+	let fogcolor = new THREE.Color(0xAAAAAA);
+	scene.fog = new THREE.FogExp2(fogcolor, 0.01);
 
 	clock = new THREE.Clock();
 }
@@ -537,6 +578,7 @@ function resizeRendererToDisplaySize(renderer) {
 }
 
 function update(deltaTime) {
+
 	controls.update(deltaTime);
 
 	// Step world
@@ -572,6 +614,7 @@ function render() {
 
 function loop() {
 	requestAnimationFrame(loop);
+	if (loading) return;
 	let deltaTime = clock.getDelta();
 	update(deltaTime);
 	render();
