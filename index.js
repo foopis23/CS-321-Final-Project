@@ -1,6 +1,6 @@
 const π = Math.PI;
 
-var scene, rootElement, canvasElement, renderer, camera, controls, clock, physicsWorld, rigidBodies = [], tmpTrans;
+var scene, rootElement, canvasElement, renderer, camera, controls, clock, physicsWorld, rigidBodies = [], tmpTrans, treeMaterials = [];
 
 function bind(scope, fn) {
 
@@ -68,34 +68,34 @@ class FirstPersonControls {
 
 		document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
 
-		var _onLockChangeAlert = bind(this, this.onLockChangeAlert);
-		var _onMouseDown = bind(this, this.onMouseDown);
-		var _onMouseUp = bind(this, this.onMouseUp);
-		var _onKeyDown = bind(this, this.onKeyDown);
-		var _onKeyUp = bind(this, this.onKeyUp);
+		this._onLockChangeAlert = bind(this, this.onLockChangeAlert);
+		this._onMouseDown = bind(this, this.onMouseDown);
+		this._onMouseUp = bind(this, this.onMouseUp);
+		this._onKeyDown = bind(this, this.onKeyDown);
+		this._onKeyUp = bind(this, this.onKeyUp);
+		this._onMouseMove = bind(this, this.onMouseMove);
 
-		document.addEventListener('pointerlockchange', _onLockChangeAlert, false);
-		document.addEventListener('mozpointerlockchange', _onLockChangeAlert, false);
+		document.addEventListener('pointerlockchange', this._onLockChangeAlert, false);
+		document.addEventListener('mozpointerlockchange', this._onLockChangeAlert, false);
 		this.domElement.addEventListener('contextmenu', (event) => { event.preventDefault(); }, false);
-		this.domElement.addEventListener('mousedown', _onMouseDown, false);
-		this.domElement.addEventListener('mouseup', _onMouseUp, false);
-		window.addEventListener('keydown', _onKeyDown, false);
-		window.addEventListener('keyup', _onKeyUp, false);
+		this.domElement.addEventListener('mousedown', this._onMouseDown, false);
+		this.domElement.addEventListener('mouseup', this._onMouseUp, false);
+		window.addEventListener('keydown', this._onKeyDown, false);
+		window.addEventListener('keyup', this._onKeyUp, false);
 
 		this.handleResize();
+		window.focus();
 		this.domElement.requestPointerLock();
 	}
 
 	onLockChangeAlert() {
-		var _onMouseMove = bind(this, this.onMouseMove);
+		
 
 		if (document.pointerLockElement === this.domElement ||
 			document.mozPointerLockElement === this.domElement) {
-			console.log('The pointer lock status is now locked');
-			this.domElement.addEventListener('mousemove', _onMouseMove, false);
+			this.domElement.addEventListener('mousemove', this._onMouseMove, false);
 		} else {
-			console.log('The pointer lock status is now unlocked');
-			this.domElement.removeEventListener('mousemove', _onMouseMove, false);
+			this.domElement.removeEventListener('mousemove', this._onMouseMove, false);
 		}
 	}
 
@@ -114,8 +114,8 @@ class FirstPersonControls {
 	}
 
 	onMouseMove(event) {
-		this.mouseX = event.movementX;
-		this.mouseY = event.movementY;
+		this.mouseX += event.movementX;
+		this.mouseY += event.movementY;
 
 		// if (this.domElement === document) {
 
@@ -134,10 +134,12 @@ class FirstPersonControls {
 	}
 
 	onMouseUp(event) {
+		window.focus();
 		this.domElement.requestPointerLock();
 	}
 
 	onKeyDown(event) {
+		console.log("test");
 		switch (event.keyCode) {
 
 			case 38: /*up*/
@@ -262,25 +264,21 @@ class FirstPersonControls {
 	}
 
 	dipose() {
-		this.domElement.removeEventListener('contextmenu', contextmenu, false);
-		this.domElement.removeEventListener('mousedown', _onMouseDown, false);
-		this.domElement.removeEventListener('mousemove', _onMouseMove, false);
-		this.domElement.removeEventListener('mouseup', _onMouseUp, false);
-
-		window.removeEventListener('keydown', _onKeyDown, false);
-		window.removeEventListener('keyup', _onKeyUp, false);
+		document.removeEventListener('pointerlockchange', this._onLockChangeAlert, false);
+		document.removeEventListener('mozpointerlockchange', this._onLockChangeAlert, false);
+		this.domElement.removeEventListener('mousedown', this._onMouseDown, false);
+		this.domElement.removeEventListener('mousemove', this._onMouseMove, false);
+		this.domElement.removeEventListener('mouseup', this._onMouseUp, false);
+		window.removeEventListener('keydown', this._onKeyDown, false);
+		window.removeEventListener('keyup', this._onKeyUp, false);
 	}
 
 	setOrientation(controls) {
-
 		var quaternion = controls.camera.quaternion;
-
 		this.lookDirection.set(0, 0, - 1).applyQuaternion(quaternion);
 		this.spherical.setFromVector3(this.lookDirection);
-
 		this.lat = 90 - THREE.MathUtils.radToDeg(this.spherical.phi);
 		this.lon = THREE.MathUtils.radToDeg(this.spherical.theta);
-
 	}
 }
 
@@ -327,7 +325,7 @@ function createPlayer() {
 	playerWrapper.updateMatrixWorld();
 	controls = new FirstPersonControls(playerWrapper, camera, canvasElement);
 	controls.movementSpeed = 5;
-	controls.lookSpeed = 5;
+	controls.lookSpeed = 10;
 	scene.add(playerWrapper);
 
 	//Ammojs Section
@@ -392,6 +390,62 @@ function createFloor() {
 	physicsWorld.addRigidBody(body);
 }
 
+function generateTrees(object) {
+	const mapWidth = 250;
+	const mapDepth = 250;
+	const treeDensity = 0.2;
+	const posVariation = 1;
+	const scaleVariation = 0.2;
+	const trunkVariation = 0.1;
+	const treeDistance = 3;
+
+	let mapWidthH = mapWidth/2;
+	let mapDepthH = mapDepth/2;
+	for (let x = -mapWidthH; x < mapWidthH; x += treeDistance) {
+		for (let z = -mapDepthH; z < mapDepthH; z += treeDistance) {
+			if (Math.abs(x) < 3 && Math.abs(z) < 3) continue;
+
+			if (Math.random() < treeDensity) {
+				//threejs stuff
+				let newObj = object.clone(true);
+
+				let posX = x + Math.random() * (posVariation * 2) - posVariation;
+				let posY = -2 + Math.random() * (trunkVariation * 2) - trunkVariation
+				let posZ = z + Math.random() * (posVariation * 2) - posVariation;
+				
+				let scaleY = scaleVariation + Math.random() * (scaleVariation * 2) - scaleVariation;
+
+				let pos = { x: posX, y: posY, z: posZ };
+				let scale = { x: 1, y: 1 + scaleY, z: 1 };
+				let quat = { x: 0, y: 0, z: 0, w: 1 };
+				let mass = 0;
+
+				newObj.position.set(pos.x, pos.y, pos.z);
+				newObj.scale.set(scale.x, scale.y, scale.z);
+				scene.add(newObj);
+
+				//ammo stuff
+				let transform = new Ammo.btTransform();
+				transform.setIdentity();
+				transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+				transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+				let motionState = new Ammo.btDefaultMotionState(transform);
+			
+				let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5 * 2, scale.y * 0.5 * 4, scale.z * 0.5 * 2));
+				colShape.setMargin(0.05);
+			
+				let localInertia = new Ammo.btVector3(0, 0, 0);
+				colShape.calculateLocalInertia(mass, localInertia);
+			
+				let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+				let body = new Ammo.btRigidBody(rbInfo);
+			
+				physicsWorld.addRigidBody(body);
+			}
+		}
+	}
+}
+
 function setupPhyiscsWorld() {
 	let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration(),
 		dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration),
@@ -452,25 +506,7 @@ function setupGraphics() {
 				child.receiveShadow = true;
 			})
 
-			const treeDensity = 0.2;
-			const posVariation = 1;
-			const scaleVariation = 0.2;
-			const trunkVariation = 0.1;
-
-			for (let x = -125; x < 125; x += 2.5) {
-				for (let z = -125; z < 125; z += 2.5) {
-					if (Math.random() < treeDensity) {
-						let newObj = object.clone(true);
-						let posX = x + Math.random() * (posVariation * 2) - posVariation;
-						let posZ = z + Math.random() * (posVariation * 2) - posVariation;
-						let posY = -2 + Math.random() * (trunkVariation * 2) - trunkVariation
-						let scale = scaleVariation + Math.random() * (scaleVariation * 2) - scaleVariation;
-						newObj.position.set(posX, posY, posZ);
-						newObj.scale.set(1, 1 + scale, 1);
-						scene.add(newObj);
-					}
-				}
-			}
+			generateTrees(object);
 		});
 	});
 
@@ -510,6 +546,7 @@ function update(deltaTime) {
 	for (let i = 0; i < rigidBodies.length; i++) {
 		let objThree = rigidBodies[i];
 		let objAmmo = objThree.userData.physicsBody;
+		objAmmo.setActivationState(1);
 		let ms = objAmmo.getMotionState();
 		if (ms) {
 			ms.getWorldTransform(tmpTrans);
