@@ -23,6 +23,7 @@ var button;
 var lightBridge;
 var lightBridgeCollisionRestore;
 var fallingToEarth;
+var endingPortal;
 
 function bind(scope, fn) {
 
@@ -586,7 +587,7 @@ function addHouse() {
 	//floor
 	addBox(x, -182, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
 
-	lightBridge = createBox(x, -182, 40 / 2 - 5, 10, 1, 40, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
+	lightBridge = createBox(x, -182, 20 / 2 - 5, 10, 1, 20, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
 	lightBridge.mesh.receiveShadow = true;
 	lightBridge.mesh.castShadow = false;
 	scene.add(lightBridge.mesh);
@@ -594,7 +595,7 @@ function addHouse() {
 	lightBridgeCollisionRestore = lightBridge.body.getCollisionFlags();
 
 
-	button = new Button(0, -181.5, 30);
+	button = new Button(0, -181.5, 12);
 }
 
 function addForest(object) {
@@ -796,6 +797,16 @@ function setupGraphics() {
 	particleSystem4.position.set(0, -290, 0);
 	scene.add(particleSystem4);
 
+	const tempPortalTexture = new THREE.TextureLoader().load('portalTemp.png');
+	const material = new THREE.MeshBasicMaterial({ map: tempPortalTexture });
+
+	endingPortal = new THREE.Mesh(new THREE.PlaneBufferGeometry(3, 3), material);
+	endingPortal.visible = false;
+	endingPortal.rotation.set(0, Math.PI, 0);
+	endingPortal.position.set(0, 0, 5);
+
+	scene.add(endingPortal);
+
 	clock = new THREE.Clock();
 }
 
@@ -915,7 +926,8 @@ function update(deltaTime) {
 		if (controls.player.position.y < -280) {
 			controls.teleport(0, 740, 0, true, true, true);
 			scene.fog.color = new THREE.Color(0xAAAAAA);
-			fallingToEarth = true;;
+			fallingToEarth = true;
+			endingPortal.visible = true;
 		}
 	}
 
