@@ -1,8 +1,26 @@
 const π = Math.PI;
 
-var scene, rootElement, canvasElement, renderer, camera, controls, clock, physicsWorld, rigidBodies = [], tmpTrans, treeMaterials = [];
+var scene,
+	rootElement,
+	canvasElement,
+	renderer,
+	camera,
+	controls,
+	clock,
+	physicsWorld,
+	rigidBodies = [],
+	tmpTrans,
+	treeMaterials = [];
+
+var composer, renderPass, saoPass;
+
+var triggers = [];
 
 var loading = true;
+
+var voidTexture = null;
+
+var particleSystem, particles;
 
 function bind(scope, fn) {
 
@@ -205,12 +223,12 @@ class FirstPersonControls {
 			if (this.fly) velocity.setY(this.movementSpeed * lookAtVector.y)
 		}
 
-		if (this.moveBackward) {
-			velocity.setZ(-this.movementSpeed * lookAtVector.z);
-			velocity.setX(-this.movementSpeed * lookAtVector.x);
-		}
+		// if (this.moveBackward) {
+		// 	velocity.setZ(-this.movementSpeed * lookAtVector.z);
+		// 	velocity.setX(-this.movementSpeed * lookAtVector.x);
+		// }
 
-	
+
 
 		// if ( this.moveLeft ) {
 		// 	velocity.setZ(this.movementSpeed * lookAtVector.x);
@@ -280,21 +298,57 @@ class FirstPersonControls {
 		this.lon = THREE.MathUtils.radToDeg(this.spherical.theta);
 	}
 
-	teleport(x, y, z) {
+	teleport(x, y, z, relX, relY, relZ) {
 		let transform = this.player.userData.physicsBody.getWorldTransform();
-		transform.setOrigin(new Ammo.btVector3(x, y, z));
-	}
-
-	relTelport(x, y, z) {
-		let transform = this.player.userData.physicsBody.getWorldTransform();
-		let newX = this.player.position.x + x;
-		let newY = this.player.position.y + y;
-		let newZ = this.player.position.z + z;
+		let newX = (relX) ? this.player.position.x + x : x;
+		let newY = (relY) ? this.player.position.y + y : y;
+		let newZ = (relZ) ? this.player.position.z + z : z;
 		transform.setOrigin(new Ammo.btVector3(newX, newY, newZ));
 	}
 }
 
+class TriggerZone {
 
+	constructor(pos, scale, quat, data, otherTag, callback) {
+		this.data = data;
+		this.callback = callback;
+		this.otherTag = otherTag;
+		this.otherData = null;
+		this.enabled = true;
+
+		this.body = createRectCollider(pos, scale, quat, 0);
+
+		this.body.userData = data;
+		physicsWorld.addCollisionObject(this.body);
+
+		triggers.push(this);
+	}
+
+	shouldTrigger(rb1, rb2) {
+		if (this.enabled == false) return false;
+
+		let data1 = rb1.userData;
+		let data2 = rb2.userData;
+
+		if (data1 && data2) {
+			if ((data1.tag == this.otherTag && data2.tag == this.data.tag)) {
+				this.otherData = data1;
+				return true;
+			} else if ((data1.tag == this.data.tag && data2.tag == this.otherTag)) {
+				this.otherData = data2;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	trigger() {
+		if (this.callback != null && this.enabled) {
+			this.callback(this.data, this.otherData);
+		}
+	}
+}
 
 function createPlayer() {
 	let pos = { x: 0, y: 0, z: 0 };
@@ -307,7 +361,7 @@ function createPlayer() {
 	let fov = 75;
 	let aspect = 2;  // the canvas default
 	let near = 0.1;
-	let far = 500;
+	let far = 60;
 	camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	playerWrapper.add(camera);
 	playerWrapper.position.set(pos.x, pos.y, pos.z);
@@ -335,6 +389,9 @@ function createPlayer() {
 	let body = new Ammo.btRigidBody(rbInfo);
 
 	body.setAngularFactor(0, 1, 0)
+
+	body.userData = {};
+	body.userData.tag = "player";
 
 	physicsWorld.addRigidBody(body);
 
@@ -414,25 +471,47 @@ function addHouse() {
 	const depth = 10;
 	const z = -10;
 	const x = 0;
-	const material = new THREE.MeshPhongMaterial({color: 0x5F443E});
+	const material = new THREE.MeshPhongMaterial({ color: 0x5F443E });
 
 	//backWall
 	addBox(x, 0, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
-	addBox(x, -90, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
 
 	//left sidewall
 	addBox(x - width / 2, 0, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
-	addBox(x - width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//right sidwall
 	addBox(x + width / 2, 0, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
-	addBox(x + width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//roof
 	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
+
+	//teleport trigger
+	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: -90, z: 0 } }, "player", function (teleportData, playerData) {
+		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
+		scene.background = new THREE.Color(0x000000);
+		// scene.fog.color = new THREE.Color(0x000000);
+		scene.needsUpdate = true;
+	});
+
+	//void area
+
+	//back wall
+	addBox(x, -90, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
+
+	//left side wall
+	addBox(x - width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+
+	//right side wall
+	addBox(x + width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+
+	//roof
 	addBox(x, height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
-	addBox(x, -92, z, width, height, 0.5, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, true)
+	//floor
+	addBox(x, -92, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+
+
+	addBox(x, -92, 40 / 2 - 5, 10, 1, 40, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
 }
 
 function addForest(object) {
@@ -443,7 +522,7 @@ function addForest(object) {
 	const scaleVariation = 0.2;
 	const trunkVariation = 0.1;
 	const treeDistance = 2.6;
-	addBox(0, -2, 0, mapWidth, 1, mapDepth, 0, 0, 0, new THREE.MeshPhongMaterial({color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000}), 0, true, false);
+	addBox(0, -2, 0, mapWidth, 1, mapDepth, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, false);
 
 	let mapWidthH = mapWidth / 2;
 	let mapDepthH = mapDepth / 2;
@@ -471,21 +550,12 @@ function addForest(object) {
 				scene.add(newObj);
 
 				//ammo stuff
-				let transform = new Ammo.btTransform();
-				transform.setIdentity();
-				transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
-				transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
-				let motionState = new Ammo.btDefaultMotionState(transform);
-
-				let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5 * 2, scale.y * 0.5 * 6, scale.z * 0.5 * 2));
-				colShape.setMargin(0.05);
-
-				let localInertia = new Ammo.btVector3(0, 0, 0);
-				colShape.calculateLocalInertia(mass, localInertia);
-
-				let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
-				let body = new Ammo.btRigidBody(rbInfo);
-
+				//this part is kind of funny. Since I didn't normalize the tree model the hit box needs to be a different scale than the model
+				scale.x *= 2;
+				scale.y *= 5;
+				scale.z *= 2;
+				pos.y += scale.y / 2;
+				let body = createRectCollider(pos, scale, quat, mass);
 				physicsWorld.addRigidBody(body);
 			}
 		}
@@ -535,6 +605,8 @@ function setupGraphics() {
 		});
 	});
 
+
+
 	//create lights
 	let light1 = new THREE.AmbientLight(0x222244, 2);
 
@@ -551,7 +623,7 @@ function setupGraphics() {
 	light2.shadow.camera.right = 250;
 	light2.shadow.camera.bottom = -100;
 	light2.shadow.camera.top = 100;
-	scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({color: 0xffff00})));
+	// scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0xffff00 })));
 	scene.add(light1);
 	scene.add(light2);
 
@@ -561,10 +633,59 @@ function setupGraphics() {
 	//create playable character
 	createPlayer();
 
+	const loader = new THREE.CubeTextureLoader();
+	const texturePath = "xneg_1.png";
+	voidTexture = loader.load([
+		texturePath,
+		texturePath,
+		texturePath,
+		texturePath,
+		texturePath,
+		texturePath,
+	]);
+
 	let skycolor = new THREE.Color(0xAA9999);
 	scene.background = skycolor;
 	let fogcolor = new THREE.Color(0xAAAAAA);
-	scene.fog = new THREE.FogExp2(fogcolor, 0.03);
+	scene.fog = new THREE.FogExp2(fogcolor, 0.025);
+
+	composer = new THREE.EffectComposer(renderer);
+	renderPass = new THREE.RenderPass(scene, camera);
+	composer.addPass(renderPass)
+	saoPass = new THREE.SAOPass(scene, camera, false, true);
+	saoPass.enabled = false;
+	composer.addPass(saoPass);
+
+	var particleCount = 5000;
+    particles = new THREE.Geometry();
+    var pMaterial = new THREE.PointsMaterial({
+      color: 0xFFFFFF,
+      size: 0.1
+    });
+
+	// now create the individual particles
+	for (var p = 0; p < particleCount; p++) {
+
+	// create a particle with random
+	// position values, -250 -> 250
+	var pX = Math.random() * 100 - 50,
+		pY = (Math.random() * 100 - 50) - 90,
+		pZ = Math.random() * 100 - 50,
+		particle = new THREE.Vector3(pX, pY, pZ)
+
+		if (Math.abs(pX) < 5 && pZ < 0 && pY > -90 && pY <-85) continue;
+
+		// add it to the geometry
+		particles.vertices.push(particle);
+	}
+
+	// create the particle system
+	particleSystem = new THREE.Points(
+		particles,
+		pMaterial);
+
+	// add it to the scene
+	scene.add(particleSystem);
 
 	clock = new THREE.Clock();
 }
@@ -588,8 +709,43 @@ function resizeRendererToDisplaySize(renderer) {
 	return needResize;
 }
 
-function update(deltaTime) {
+function detectCollision() {
 
+	let dispatcher = physicsWorld.getDispatcher();
+	let numManifolds = dispatcher.getNumManifolds();
+
+	let needsTriggered = [];
+
+	for (let i = 0; i < numManifolds; i++) {
+
+		let contactManifold = dispatcher.getManifoldByIndexInternal(i);
+		let numContacts = contactManifold.getNumContacts();
+
+		for (let j = 0; j < numContacts; j++) {
+
+			let contactPoint = contactManifold.getContactPoint(j);
+			let distance = contactPoint.getDistance();
+
+			if (distance > 0.0) continue;
+
+			let rb0 = Ammo.castObject(contactManifold.getBody0(), Ammo.btRigidBody);
+			let rb1 = Ammo.castObject(contactManifold.getBody1(), Ammo.btRigidBody);
+
+			triggers.forEach((trigger) => {
+				if (trigger.shouldTrigger(rb0, rb1)) {
+					needsTriggered.push(trigger);
+				}
+			});
+		}
+	}
+
+	needsTriggered.forEach((el) => {
+		el.trigger();
+	});
+
+}
+
+function update(deltaTime) {
 	controls.update(deltaTime);
 
 	// Step world
@@ -610,6 +766,8 @@ function update(deltaTime) {
 			objThree.updateMatrixWorld();
 		}
 	}
+
+	detectCollision();
 }
 
 function render() {
@@ -620,7 +778,8 @@ function render() {
 	}
 
 	//draw
-	renderer.render(scene, camera);
+	// renderer.render(scene, camera);
+	composer.render();
 }
 
 function loop() {
@@ -633,23 +792,23 @@ function loop() {
 
 function toggleMaterialSetting(key) {
 	let materialsSwitched = {};
-	
+
 	scene.children.forEach((child) => {
-		switch(child.type) {
+		switch (child.type) {
 			case "Mesh":
 				if (!materialsSwitched[child.material.uuid]) {
 					child.material[key] = !child.material[key];
 					child.material.needsUpdate = true;
 					materialsSwitched[child.material.uuid] = true;
 				}
-				
+
 				break;
 			case "Group": //handles duplicated trees
 				if (!materialsSwitched[child.children[0].material[0].uuid] || !materialsSwitched[child.children[0].material[1].uuid]) {
 					child.children[0].material[0][key] = !child.children[0].material[0][key];
 					child.children[0].material[0].needsUpdate = true;
 					materialsSwitched[child.children[0].material[0].uuid] = true;
-					
+
 					child.children[0].material[1][key] = !child.children[0].material[1][key];
 					child.children[0].material[1].needsUpdate = true;
 					materialsSwitched[child.children[0].material[1].uuid] = true;
