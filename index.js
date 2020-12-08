@@ -13,14 +13,16 @@ var scene,
 	treeMaterials = [];
 
 var composer, renderPass, saoPass;
-
 var triggers = [];
-
 var loading = true;
-
 var voidTexture = null;
-
 var particleSystem, particles;
+var fellOutOfMapCount = 0;
+var buttonWasPress = false;
+var button;
+var lightBridge;
+var lightBridgeCollisionRestore;
+var fallingToEarth;
 
 function bind(scope, fn) {
 
@@ -72,6 +74,8 @@ class FirstPersonControls {
 		this.moveBackward = false;
 		this.moveLeft = false;
 		this.moveRight = false;
+
+		this.interactionAttempt = false;
 
 		this.viewHalfX = 0;
 		this.viewHalfY = 0;
@@ -181,6 +185,7 @@ class FirstPersonControls {
 			case 39: /*right*/
 			case 68: /*D*/ this.moveRight = false; break;
 
+			case 70: /*F*/ this.interactionAttempt = true; break;
 
 			//toggle stuff
 			case 219: /*[*/ toggleFlatShading(); break;
@@ -217,28 +222,15 @@ class FirstPersonControls {
 		if (this.fly) velocity.setY(0);
 		angularVelocity.setY(0);
 
+		if (velocity.y() < -100) {
+			velocity.setY(-100);
+		}
+
 		if (this.moveForward || (this.autoForward && !this.moveBackward)) {
 			velocity.setZ(this.movementSpeed * lookAtVector.z);
 			velocity.setX(this.movementSpeed * lookAtVector.x);
 			if (this.fly) velocity.setY(this.movementSpeed * lookAtVector.y)
 		}
-
-		// if (this.moveBackward) {
-		// 	velocity.setZ(-this.movementSpeed * lookAtVector.z);
-		// 	velocity.setX(-this.movementSpeed * lookAtVector.x);
-		// }
-
-
-
-		// if ( this.moveLeft ) {
-		// 	velocity.setZ(this.movementSpeed * lookAtVector.x);
-		// 	velocity.setX(this.movementSpeed * lookAtVector.z);
-		// } 
-
-		// if ( this.moveRight ) {
-		// 	velocity.setZ(-this.movementSpeed * lookAtVector.x);
-		// 	velocity.setX(-this.movementSpeed * lookAtVector.z);
-		// }
 
 		var actualLookSpeed = delta * this.lookSpeed;
 
@@ -346,6 +338,89 @@ class TriggerZone {
 	trigger() {
 		if (this.callback != null && this.enabled) {
 			this.callback(this.data, this.otherData);
+		}
+	}
+}
+
+class Button {
+
+	constructor(x, y, z) {
+		addBox(x, y + 0.5, z, 0.5, 1, 0.5, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xAAAAAA }), 0, true, true);
+
+		this.buttonMesh = new THREE.Mesh(
+			new THREE.CylinderBufferGeometry(0.2, 0.2, 0.1),
+			new THREE.MeshPhongMaterial({ color: 0xFF0000 })
+		);
+
+		this.buttonMesh.position.set(x, y + 1, z);
+		this.buttonMesh.castShadow = true;
+		this.buttonMesh.receiveShadow = true;
+
+		scene.add(this.buttonMesh);
+		this.animating = false;
+		this.currentTime = 0;
+		this.animation = [
+			{ x: x, y: (y + 1), z: z, time: 0 },
+			{ x: x, y: (y + 0.95), z: z, time: 0.25 },
+			{ x: x, y: (y + 1), z: z, time: 0.5 }
+		]
+
+		this.pressed = false;
+
+		new TriggerZone({ x, y: y + 1.25, z }, { x: 0.5, y: 0.5, z: 0.5 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "button" }, "player", (buttonData, playerData) => {
+			if (controls.interactionAttempt && this.animating == false) {
+				this.animating = true;
+				this.currentTime = 0;
+			}
+		});
+
+		const texture = new THREE.TextureLoader().load('buttonText.png');
+		const material = new THREE.MeshBasicMaterial({ map: texture });
+		let buttonTextMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(), material);
+		buttonTextMesh.position.set(x, y + 2.25, z);
+		buttonTextMesh.rotation.set(0, Math.PI, 0);
+		scene.add(buttonTextMesh);
+	}
+
+	update(dt) {
+		if (this.animating) {
+			this.currentTime += dt;
+			let currentKeyframe;
+			let nextKeyframe;
+
+			for (let i = 0; i < this.animation.length; i++) {
+				let keyframe = this.animation[i];
+				if (this.currentTime >= keyframe.time) {
+					currentKeyframe = keyframe;
+
+					if (i == this.animation.length - 1) {
+						nextKeyframe = keyframe;
+						this.animating = false;
+						this.currentTime = 0;
+						break;
+					}
+				} else {
+					nextKeyframe = keyframe;
+					break;
+				}
+			}
+
+			if (nextKeyframe == currentKeyframe) {
+				this.buttonMesh.position.set(currentKeyframe.x, currentKeyframe.y, currentKeyframe.z);
+				this.animating = false;
+				this.pressed = true;
+			} else {
+				let percent = (this.currentTime - currentKeyframe.time) / (nextKeyframe.time - currentKeyframe.time)
+				let posX = (nextKeyframe.x - currentKeyframe.x) * percent + currentKeyframe.x
+				let posY = (nextKeyframe.y - currentKeyframe.y) * percent + currentKeyframe.y;
+				let posZ = (nextKeyframe.z - currentKeyframe.z) * percent + currentKeyframe.z;
+				this.buttonMesh.position.set(posX, posY, posZ);
+			}
+		}
+
+		if (this.pressed && fellOutOfMapCount > -1) {
+			lightBridge.mesh.visible = false;
+			lightBridge.body.setCollisionFlags(4);
 		}
 	}
 }
@@ -471,7 +546,7 @@ function addHouse() {
 	const depth = 10;
 	const z = -10;
 	const x = 0;
-	const material = new THREE.MeshPhongMaterial({ color: 0x5F443E });
+	const material = new THREE.MeshPhongMaterial({ color: 0x000000, reflectivity: 0, specular: 0 });
 
 	//backWall
 	addBox(x, 0, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
@@ -486,32 +561,40 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//teleport trigger
-	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: -90, z: 0 } }, "player", function (teleportData, playerData) {
+	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: -180, z: 0 } }, "player", function (teleportData, playerData) {
 		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
 		scene.background = new THREE.Color(0x000000);
 		// scene.fog.color = new THREE.Color(0x000000);
+		// scene.fog.density = 0.025;
 		scene.needsUpdate = true;
 	});
 
 	//void area
 
 	//back wall
-	addBox(x, -90, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
+	addBox(x, -180, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
 
 	//left side wall
-	addBox(x - width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x - width / 2, -180, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//right side wall
-	addBox(x + width / 2, -90, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x + width / 2, -180, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//roof
-	addBox(x, height / 2 - 0.25 - 90, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
+	addBox(x, height / 2 - 0.25 - 180, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//floor
-	addBox(x, -92, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+	addBox(x, -182, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+
+	lightBridge = createBox(x, -182, 40 / 2 - 5, 10, 1, 40, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
+	lightBridge.mesh.receiveShadow = true;
+	lightBridge.mesh.castShadow = false;
+	scene.add(lightBridge.mesh);
+	physicsWorld.addRigidBody(lightBridge.body);
+	lightBridgeCollisionRestore = lightBridge.body.getCollisionFlags();
 
 
-	addBox(x, -92, 40 / 2 - 5, 10, 1, 40, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
+	button = new Button(0, -181.5, 30);
 }
 
 function addForest(object) {
@@ -621,8 +704,8 @@ function setupGraphics() {
 	light2.shadow.camera.far = 600; // default
 	light2.shadow.camera.left = -250;
 	light2.shadow.camera.right = 250;
-	light2.shadow.camera.bottom = -100;
-	light2.shadow.camera.top = 100;
+	light2.shadow.camera.bottom = -300;
+	light2.shadow.camera.top = 300;
 	// scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0xffff00 })));
 	scene.add(light1);
 	scene.add(light2);
@@ -657,23 +740,23 @@ function setupGraphics() {
 	composer.addPass(saoPass);
 
 	var particleCount = 5000;
-    particles = new THREE.Geometry();
-    var pMaterial = new THREE.PointsMaterial({
-      color: 0xFFFFFF,
-      size: 0.1
-    });
+	particles = new THREE.Geometry();
+	var pMaterial = new THREE.PointsMaterial({
+		color: 0xFFFFFF,
+		size: 0.1
+	});
 
 	// now create the individual particles
 	for (var p = 0; p < particleCount; p++) {
 
-	// create a particle with random
-	// position values, -250 -> 250
-	var pX = Math.random() * 100 - 50,
-		pY = (Math.random() * 100 - 50) - 90,
-		pZ = Math.random() * 100 - 50,
-		particle = new THREE.Vector3(pX, pY, pZ)
+		// create a particle with random
+		// position values, -250 -> 250
+		var pX = Math.random() * 100 - 50,
+			pY = (Math.random() * 100 - 50),
+			pZ = Math.random() * 100 - 50,
+			particle = new THREE.Vector3(pX, pY, pZ)
 
-		if (Math.abs(pX) < 5 && pZ < 0 && pY > -90 && pY <-85) continue;
+		if (Math.abs(pX) < 5 && pZ < 0 && pY > -90 && pY < -85) continue;
 
 		// add it to the geometry
 		particles.vertices.push(particle);
@@ -684,8 +767,34 @@ function setupGraphics() {
 		particles,
 		pMaterial);
 
+		particleSystem.position.set(0, -90, 0);
+
 	// add it to the scene
 	scene.add(particleSystem);
+
+	let particleSystem2 = new THREE.Points(
+		particles,
+		pMaterial
+	)
+
+	particleSystem2.position.set(0, 400, 0);
+	scene.add(particleSystem2)
+
+	let particleSystem3 = new THREE.Points(
+		particles,
+		pMaterial
+	);
+
+	particleSystem3.position.set(0, -190, 0);
+	scene.add(particleSystem3)
+
+	let particleSystem4 = new THREE.Points(
+		particles,
+		pMaterial
+	);
+
+	particleSystem4.position.set(0, -290, 0);
+	scene.add(particleSystem4);
 
 	clock = new THREE.Clock();
 }
@@ -748,6 +857,68 @@ function detectCollision() {
 function update(deltaTime) {
 	controls.update(deltaTime);
 
+	if (fallingToEarth == true) {
+		let skyColor = new THREE.Color(0xAA9999);
+
+		if (controls.player.position.y < 100) {
+			scene.background = skyColor;
+			fallingToEarth = false;
+		}else if (controls.player.position.y > 300) {
+			scene.background = new THREE.Color(0, 0, 0);
+		}else{
+			let step = (300-controls.player.position.y)/(300-100);
+			let interpolation = new THREE.Color(skyColor.r*step, skyColor.g*step, skyColor.b*step);
+			scene.background = interpolation;
+		}
+
+	}
+
+	if (button.pressed) {
+		if (fellOutOfMapCount > 11) {
+			scene.fog.density = 2;
+			controls.player.userData.physicsBody.getLinearVelocity().setY(0);
+			controls.teleport(0, -180, -10, false, false, false)
+			fellOutOfMapCount = -1;
+			lightBridge.body.setCollisionFlags(lightBridgeCollisionRestore);
+			lightBridge.mesh.visible = true;
+			controls.enabled = false;
+		} else if (fellOutOfMapCount < 0) {
+			scene.fog.density -= 0.4 * deltaTime;
+			if (scene.fog.density <= 0.025) {
+				controls.enabled = true;
+				scene.fog.density = 0.025;
+				fellOutOfMapCount = 0;
+				button.pressed = false;
+			}
+		} else {
+			if (controls.player.position.y < -280) {
+				fellOutOfMapCount++;
+				scene.fog.color = new THREE.Color(0, 0, 0);
+				controls.teleport(0, 200, 0, true, true, true);
+			}
+		
+			if (fellOutOfMapCount > 3) {
+				scene.fog.color = new THREE.Color(0, 0, 0);
+				scene.fog.density += 0.001 * deltaTime;
+			}
+		
+			if (fellOutOfMapCount > 8) {
+				controls.enabled = false;
+				scene.fog.density += 0.01 * deltaTime;
+			}
+		
+			if (fellOutOfMapCount > 10) {
+				scene.fog.density += 0.1 * deltaTime;
+			}
+		}
+	} else {
+		if (controls.player.position.y < -280) {
+			controls.teleport(0, 740, 0, true, true, true);
+			scene.fog.color = new THREE.Color(0xAAAAAA);
+			fallingToEarth = true;;
+		}
+	}
+
 	// Step world
 	physicsWorld.stepSimulation(deltaTime, 10);
 
@@ -768,6 +939,9 @@ function update(deltaTime) {
 	}
 
 	detectCollision();
+
+	button.update(deltaTime);
+	controls.interactionAttempt = false;
 }
 
 function render() {
