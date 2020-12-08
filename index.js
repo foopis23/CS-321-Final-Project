@@ -758,7 +758,7 @@ function setupGraphics() {
 			pZ = Math.random() * 100 - 50,
 			particle = new THREE.Vector3(pX, pY, pZ)
 
-		if (Math.abs(pX) < 15 && pZ <-5 && pZ > -15 && pY > 0 && pY < 15) continue;
+		if (Math.abs(pX) < 15 && pZ <-5 && pZ > -15 && pY > -2 && pY < 15) continue;
 
 		// add it to the geometry
 		particles.vertices.push(particle);
