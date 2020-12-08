@@ -25,6 +25,8 @@ var lightBridgeCollisionRestore;
 var fallingToEarth;
 var endingPortal;
 
+var voidOffset = 600;
+
 function bind(scope, fn) {
 
 	return function () {
@@ -562,7 +564,7 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//teleport trigger
-	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: -180, z: 0 } }, "player", function (teleportData, playerData) {
+	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: voidOffset, z: 0 } }, "player", function (teleportData, playerData) {
 		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
 		scene.background = new THREE.Color(0x000000);
 		// scene.fog.color = new THREE.Color(0x000000);
@@ -571,31 +573,29 @@ function addHouse() {
 	});
 
 	//void area
-
 	//back wall
-	addBox(x, -180, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
+	addBox(x, voidOffset, z - depth / 2 + 0.25, width, height, 0.5, 0, 0, 0, material, 0, true, true);
 
 	//left side wall
-	addBox(x - width / 2, -180, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x - width / 2, voidOffset, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//right side wall
-	addBox(x + width / 2, -180, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
+	addBox(x + width / 2, voidOffset, z, width, height, 0.5, 0, Math.PI / 2, 0, material, 0, true, true);
 
 	//roof
-	addBox(x, height / 2 - 0.25 - 180, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
+	addBox(x, height / 2 - 0.25 + voidOffset, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//floor
-	addBox(x, -182, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+	addBox(x, voidOffset - 2, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
 
-	lightBridge = createBox(x, -182, 20 / 2 - 5, 10, 1, 20, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
+	lightBridge = createBox(x, voidOffset - 2, 20 / 2 - 5, 10, 1, 20, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
 	lightBridge.mesh.receiveShadow = true;
 	lightBridge.mesh.castShadow = false;
 	scene.add(lightBridge.mesh);
 	physicsWorld.addRigidBody(lightBridge.body);
 	lightBridgeCollisionRestore = lightBridge.body.getCollisionFlags();
 
-
-	button = new Button(0, -181.5, 12);
+	button = new Button(0, voidOffset - 1.5, 12);
 }
 
 function addForest(object) {
@@ -705,11 +705,12 @@ function setupGraphics() {
 	light2.shadow.camera.far = 600; // default
 	light2.shadow.camera.left = -250;
 	light2.shadow.camera.right = 250;
-	light2.shadow.camera.bottom = -300;
-	light2.shadow.camera.top = 300;
+	light2.shadow.camera.bottom = -700;
+	light2.shadow.camera.top = 700;
 	// scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0xffff00 })));
 	scene.add(light1);
 	scene.add(light2);
+	// scene.add(light3);
 
 	//create a little building
 	addHouse();
@@ -768,7 +769,7 @@ function setupGraphics() {
 		particles,
 		pMaterial);
 
-		particleSystem.position.set(0, -90, 0);
+		particleSystem.position.set(0, voidOffset, 0);
 
 	// add it to the scene
 	scene.add(particleSystem);
@@ -778,15 +779,15 @@ function setupGraphics() {
 		pMaterial
 	)
 
-	particleSystem2.position.set(0, 400, 0);
-	scene.add(particleSystem2)
+	// particleSystem2.position.set(0, 400, 0);
+	// scene.add(particleSystem2)
 
 	let particleSystem3 = new THREE.Points(
 		particles,
 		pMaterial
 	);
 
-	particleSystem3.position.set(0, -190, 0);
+	particleSystem3.position.set(0, voidOffset - 100, 0);
 	scene.add(particleSystem3)
 
 	let particleSystem4 = new THREE.Points(
@@ -794,7 +795,7 @@ function setupGraphics() {
 		pMaterial
 	);
 
-	particleSystem4.position.set(0, -290, 0);
+	particleSystem4.position.set(0, voidOffset -200, 0);
 	scene.add(particleSystem4);
 
 	const tempPortalTexture = new THREE.TextureLoader().load('portalTemp.png');
@@ -874,6 +875,7 @@ function update(deltaTime) {
 		if (controls.player.position.y < 100) {
 			scene.background = skyColor;
 			fallingToEarth = false;
+			controls.teleport(0, 0, 0, false, true, false);
 		}else if (controls.player.position.y > 300) {
 			scene.background = new THREE.Color(0, 0, 0);
 		}else{
@@ -888,7 +890,7 @@ function update(deltaTime) {
 		if (fellOutOfMapCount > 11) {
 			scene.fog.density = 2;
 			controls.player.userData.physicsBody.getLinearVelocity().setY(0);
-			controls.teleport(0, -180, -10, false, false, false)
+			controls.teleport(0, voidOffset, -10, false, false, false)
 			fellOutOfMapCount = -1;
 			lightBridge.body.setCollisionFlags(lightBridgeCollisionRestore);
 			lightBridge.mesh.visible = true;
@@ -902,7 +904,7 @@ function update(deltaTime) {
 				button.pressed = false;
 			}
 		} else {
-			if (controls.player.position.y < -280) {
+			if (controls.player.position.y < voidOffset-200 && Math.abs(controls.player.position.y) > 50) {
 				fellOutOfMapCount++;
 				scene.fog.color = new THREE.Color(0, 0, 0);
 				controls.teleport(0, 200, 0, true, true, true);
@@ -923,8 +925,8 @@ function update(deltaTime) {
 			}
 		}
 	} else {
-		if (controls.player.position.y < -280) {
-			controls.teleport(0, 740, 0, true, true, true);
+		if (controls.player.position.y < voidOffset-100 && Math.abs(controls.player.position.y) > 50) {
+			// controls.teleport(0, 740, 0, true, true, true);
 			scene.fog.color = new THREE.Color(0xAAAAAA);
 			fallingToEarth = true;
 			endingPortal.visible = true;
