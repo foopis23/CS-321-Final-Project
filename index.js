@@ -764,6 +764,7 @@ function setupGraphics() {
 	composer.addPass(renderPass)
 	saoPass = new THREE.SAOPass(scene, camera, false, true);
 	saoPass.params.saoScale = 8;
+	saoPass.enabled = false;
 	composer.addPass(saoPass);
 	glitchPass = new THREE.GlitchPass();
 	glitchPass.enabled = false;
