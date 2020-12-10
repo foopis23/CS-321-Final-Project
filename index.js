@@ -12,7 +12,7 @@ var scene,
 	tmpTrans,
 	treeMaterials = [];
 
-var composer, renderPass, saoPass, glitchPass;
+var composer, renderPass, saoPass, glitchPass, bloomPass;
 var triggers = [];
 var loading = true;
 var voidTexture = null;
@@ -25,9 +25,15 @@ var lightBridgeCollisionRestore;
 var fallingToEarth;
 var endingPortal;
 
+
 var voidOffset = 600;
 
 var directionalLight;
+
+var stats = new Stats();
+var performanceMode = 3;
+stats.showPanel(performanceMode);
+document.body.appendChild(stats.dom);
 
 function bind(scope, fn) {
 
@@ -194,7 +200,12 @@ class FirstPersonControls {
 
 			//toggle stuff
 			case 219: /*[*/ toggleFlatShading(); break;
+			
 			case 221: /*]*/ toggleWireframe(); break;
+			
+			case 80: /*P*/
+				performanceMode = (performanceMode + 1) % 4;
+				stats.showPanel(performanceMode);
 		}
 	}
 
@@ -750,11 +761,14 @@ function setupGraphics() {
 	renderPass = new THREE.RenderPass(scene, camera);
 	composer.addPass(renderPass)
 	saoPass = new THREE.SAOPass(scene, camera, false, true);
-	saoPass.enabled = false;
+	saoPass.params.saoScale = 8;
 	composer.addPass(saoPass);
 	glitchPass = new THREE.GlitchPass();
 	glitchPass.enabled = false;
 	composer.addPass(glitchPass);
+	bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(canvasElement.clientWidth, canvasElement.clientWidth), 1.5, 0.1, 0.54);
+	bloomPass.enabled = false;
+	composer.addPass(bloomPass);
 
 
 	var particleCount = 5000;
@@ -992,10 +1006,12 @@ function render() {
 
 function loop() {
 	requestAnimationFrame(loop);
+	stats.begin();
 	if (loading) return;
 	let deltaTime = clock.getDelta();
 	update(deltaTime);
 	render();
+	stats.end();
 }
 
 function toggleMaterialSetting(key) {
