@@ -30,6 +30,8 @@ var voidOffset = 600;
 
 var directionalLight;
 
+var moveTrees = false;
+
 var stats = new Stats();
 var performanceMode = 3;
 stats.showPanel(performanceMode);
@@ -578,7 +580,7 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//teleport trigger
-	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: voidOffset, z: 0 } }, "player", function (teleportData, playerData) {
+	new TriggerZone({ x: 0, y: -2, z: -10 }, { x: 10, y: 1, z: 10 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: voidOffset, z: 0 } }, "player", function (teleportData, playerData) {
 		scene.background = new THREE.Color(0x000000);
 		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
 		directionalLight.visible = false;
@@ -598,7 +600,7 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25 + voidOffset, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//floor
-	addBox(x, voidOffset - 2, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+	addBox(x, voidOffset - 2, z, width-1, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
 
 	lightBridge = createBox(x, voidOffset - 2, 20 / 2 - 5, 10, 1, 20, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
 	lightBridge.mesh.receiveShadow = true;
@@ -897,6 +899,10 @@ function detectCollision() {
 
 }
 
+function update_trees(dt) {
+	if (!moveTrees) return; 
+}
+
 function update(deltaTime) {
 	controls.update(deltaTime);
 
@@ -986,6 +992,8 @@ function update(deltaTime) {
 	}
 
 	detectCollision();
+
+	update_trees();
 
 	button.update(deltaTime);
 	controls.interactionAttempt = false;
