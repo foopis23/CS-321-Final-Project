@@ -834,10 +834,14 @@ function setupGraphics() {
 	const tempPortalTexture = new THREE.TextureLoader().load('portalTemp.png');
 	const material = new THREE.MeshBasicMaterial({ map: tempPortalTexture });
 
+	
+	
+	const portalLight = new THREE.PointLight( 0xffffff, 2, 15, 2);
 	endingPortal = new THREE.Mesh(new THREE.PlaneBufferGeometry(3, 3), material);
+	endingPortal.add(portalLight);
 	endingPortal.visible = false;
 	endingPortal.rotation.set(0, Math.PI, 0);
-	endingPortal.position.set(0, 0, 5);
+	endingPortal.position.set(0, 0, 4.5);
 
 	scene.add(endingPortal);
 
