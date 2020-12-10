@@ -12,7 +12,7 @@ var scene,
 	tmpTrans,
 	treeMaterials = [];
 
-var composer, renderPass, saoPass;
+var composer, renderPass, saoPass, glitchPass;
 var triggers = [];
 var loading = true;
 var voidTexture = null;
@@ -26,6 +26,8 @@ var fallingToEarth;
 var endingPortal;
 
 var voidOffset = 600;
+
+var directionalLight;
 
 function bind(scope, fn) {
 
@@ -374,6 +376,7 @@ class Button {
 			if (controls.interactionAttempt && this.animating == false) {
 				this.animating = true;
 				this.currentTime = 0;
+				glitchPass.enabled = true;
 			}
 		});
 
@@ -565,11 +568,9 @@ function addHouse() {
 
 	//teleport trigger
 	new TriggerZone({ x: 0, y: 0, z: -10 }, { x: 10, y: 10, z: 1 }, { x: 0, y: 0, z: 0, w: 1 }, { tag: "teleport", location: { x: 0, y: voidOffset, z: 0 } }, "player", function (teleportData, playerData) {
-		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
 		scene.background = new THREE.Color(0x000000);
-		// scene.fog.color = new THREE.Color(0x000000);
-		// scene.fog.density = 0.025;
-		scene.needsUpdate = true;
+		controls.teleport(teleportData.location.x, teleportData.location.y, teleportData.location.z, true, false, true);
+		directionalLight.visible = false;
 	});
 
 	//void area
@@ -601,11 +602,13 @@ function addHouse() {
 function addForest(object) {
 	const mapWidth = 100;
 	const mapDepth = 100;
-	const treeDensity = 0.25;
+	const minTreeDensity = 0.25;
+	const maxTreeDensity = 0.5;
 	const posVariation = 1;
 	const scaleVariation = 0.2;
 	const trunkVariation = 0.1;
 	const treeDistance = 2.6;
+	const rotationVariation = Math.PI;
 	addBox(0, -2, 0, mapWidth, 1, mapDepth, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, false);
 
 	let mapWidthH = mapWidth / 2;
@@ -613,6 +616,8 @@ function addForest(object) {
 	for (let x = -mapWidthH; x < mapWidthH; x += treeDistance) {
 		for (let z = -mapDepthH; z < mapDepthH; z += treeDistance) {
 			if (Math.abs(x) < 11 && z < 5 && z > -20) continue;
+
+			let treeDensity = Math.min(((Math.sqrt((Math.abs(x) * Math.abs(x)) + (Math.abs(z) * Math.abs(z)))) / 50), 1) * (maxTreeDensity - minTreeDensity) + minTreeDensity;
 
 			if (Math.random() < treeDensity) {
 				//threejs stuff
@@ -623,6 +628,7 @@ function addForest(object) {
 				let posZ = z + Math.random() * (posVariation * 2) - posVariation;
 
 				let scaleY = scaleVariation + Math.random() * (scaleVariation * 2) - scaleVariation;
+
 
 				let pos = { x: posX, y: posY, z: posZ };
 				let scale = { x: 1, y: 1 + scaleY, z: 1 };
@@ -694,40 +700,46 @@ function setupGraphics() {
 	//create lights
 	let light1 = new THREE.AmbientLight(0x222244, 2);
 
-	let light2 = new THREE.DirectionalLight(0xDDDDFF, 4);
-	light2.position.set(300, 200, -100);
-	light2.castShadow = true;
+	directionalLight = new THREE.DirectionalLight(0xDDDDFF, 4);
+	directionalLight.position.set(-50, 50, -50);
+	directionalLight.target.position.set(0, 0, 0)
+	directionalLight.castShadow = true;
 
 	//the shadows still look bad :-(
-	light2.shadow.mapSize.width = 500 * 102400;
-	light2.shadow.mapSize.height = 200 * 102400;
-	light2.shadow.camera.near = 0.5; // default
-	light2.shadow.camera.far = 600; // default
-	light2.shadow.camera.left = -250;
-	light2.shadow.camera.right = 250;
-	light2.shadow.camera.bottom = -700;
-	light2.shadow.camera.top = 700;
-	// scene.add(new THREE.Mesh(new THREE.SphereBufferGeometry(), new THREE.MeshPhongMaterial({ color: 0xffff00 })));
+	directionalLight.shadow.mapSize.width = 8192;
+	directionalLight.shadow.mapSize.height = 8192;
+	directionalLight.shadow.camera.near = 0.5;
+	directionalLight.shadow.camera.far = 250;
+	directionalLight.shadow.camera.left = -80;
+	directionalLight.shadow.camera.right = 80;
+	directionalLight.shadow.camera.top = 50;
+	directionalLight.shadow.camera.bottom = -50;
+
+	var pointLight = new THREE.PointLight(0xDDDDFF, 4, 0, 2);
+	pointLight.position.set(-50, 650, -50);
+	pointLight.castShadow = true;
+
+	//the shadows still look bad :-(
+	pointLight.shadow.mapSize.width = 8192;
+	pointLight.shadow.mapSize.height = 8192;
+	pointLight.shadow.camera.near = 0.5;
+	pointLight.shadow.camera.far = 250;
+	pointLight.shadow.camera.left = -80;
+	pointLight.shadow.camera.right = 80;
+	pointLight.shadow.camera.top = 50;
+	pointLight.shadow.camera.bottom = -50;
+
+
 	scene.add(light1);
-	scene.add(light2);
-	// scene.add(light3);
+	scene.add(directionalLight);
+	scene.add(directionalLight.target);
+	scene.add(pointLight)
 
 	//create a little building
 	addHouse();
 
 	//create playable character
 	createPlayer();
-
-	const loader = new THREE.CubeTextureLoader();
-	const texturePath = "xneg_1.png";
-	voidTexture = loader.load([
-		texturePath,
-		texturePath,
-		texturePath,
-		texturePath,
-		texturePath,
-		texturePath,
-	]);
 
 	let skycolor = new THREE.Color(0xAA9999);
 	scene.background = skycolor;
@@ -740,6 +752,10 @@ function setupGraphics() {
 	saoPass = new THREE.SAOPass(scene, camera, false, true);
 	saoPass.enabled = false;
 	composer.addPass(saoPass);
+	glitchPass = new THREE.GlitchPass();
+	glitchPass.enabled = false;
+	composer.addPass(glitchPass);
+
 
 	var particleCount = 5000;
 	particles = new THREE.Geometry();
@@ -825,6 +841,7 @@ function resizeRendererToDisplaySize(renderer) {
 
 	if (needResize) {
 		renderer.setSize(width, height, false);
+		composer.setSize(width, height);
 	}
 
 	return needResize;
@@ -870,6 +887,7 @@ function update(deltaTime) {
 	controls.update(deltaTime);
 
 	if (fallingToEarth == true) {
+		directionalLight.visible = true;
 		let skyColor = new THREE.Color(0xAA9999);
 
 		if (controls.player.position.y < 100) {
@@ -908,6 +926,7 @@ function update(deltaTime) {
 				fellOutOfMapCount++;
 				scene.fog.color = new THREE.Color(0, 0, 0);
 				controls.teleport(0, 200, 0, true, true, true);
+				glitchPass.enabled = false;
 			}
 		
 			if (fellOutOfMapCount > 3) {
@@ -968,6 +987,7 @@ function render() {
 	//draw
 	// renderer.render(scene, camera);
 	composer.render();
+	directionalLight.userData.needsRendered = false;
 }
 
 function loop() {
