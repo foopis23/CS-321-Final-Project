@@ -600,7 +600,7 @@ function addHouse() {
 	addBox(x, height / 2 - 0.25 + voidOffset, z, width, height, 0.5, Math.PI / 2, 0, 0, material, 0, true, true);
 
 	//floor
-	addBox(x, voidOffset - 2, z, width-1, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true)
+	addBox(x, voidOffset - 2, z, width, height, 1, Math.PI / 2, 0, 0, new THREE.MeshPhongMaterial({ color: 0x09361e, reflectivity: 0, shininess: 0, specular: 0x000000 }), 0, true, true);
 
 	lightBridge = createBox(x, voidOffset - 2, 20 / 2 - 5, 10, 1, 20, 0, 0, 0, new THREE.MeshPhongMaterial({ color: 0xFFFFFF, opacity: 0.5, transparent: true }), 0, true, false);
 	lightBridge.mesh.receiveShadow = true;
