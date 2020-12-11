@@ -14,15 +14,15 @@ A small 3D puzzle game demo inspired by games such as Manifold Garden and Antich
 ## Goal
 This is just a demo with one example puzzle. The goal for now is just to figure out how to locate/open the portal to the next area (this portal is represented by a flat surface that just says portal to next area on it because I never got to making the portal). 
 
-## Other Information
+## About
 Project Presentation and Demo: https://youtu.be/oYlpWvCKpRU (has puzzle solution in the video)
 
 Project Website: https://foopis23.github.io/CS-321-Final-Project/
 
-### Exposed Commandline Variables
+## Exposed Commandline Variables
 In this project I left a lot of the code exposed to the global scope for debugging, but also because its just kind of fun to play arouynd with that stuff. To use this you can just open the browser console (f12) and type in commands.
 
-#### Some Basic Use Commands
+### Some Basic Use Commands
 
 Enabling Fly Mode:
 ```js
@@ -54,7 +54,7 @@ Teleport Player:
 controls.teleport(0, 600, 0, true, false, true)
 ```
 
-#### Command-line Exposed Variables
+### Command-line Exposed Variables
 ```
 scene : THREE.Scene
 rootElement: HtmlDOMElement
