@@ -1,5 +1,5 @@
 # A Non-Euclidean Game Demo 
-A small 3D puzzle game demo inspired by games such as Manifold Garden and Antichamber. This game was made for my final project in my CS-321 Computer Grahpics Course.
+A small 3D puzzle game demo inspired by games such as Manifold Garden and Antichamber. This game was made for my final project in my CS-321 Computer Grahpics Course. Also, I know this isn't true Non-Euclidean Geomtry. That was not my goal, I just want to provide an experience using smoke and mirros to emulate that kind of environment. 
 
 ## Controls
 | Description            | Control        |
