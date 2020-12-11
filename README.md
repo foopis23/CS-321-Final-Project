@@ -54,7 +54,7 @@ Teleport Player:
 controls.teleport(0, 600, 0, true, false, true)
 ```
 
-### Command-line Exposed Variables
+### List of Exposed Variables
 ```
 scene : THREE.Scene
 rootElement: HtmlDOMElement
