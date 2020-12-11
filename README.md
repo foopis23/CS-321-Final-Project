@@ -17,7 +17,7 @@ This is just a demo with one example puzzle. The goal for now is just to figure 
 ## About
 Project Presentation and Demo: https://youtu.be/oYlpWvCKpRU (has puzzle solution in the video)
 
-Project Website: https://foopis23.github.io/CS-321-Final-Project/
+Project Website: https://foopis23.github.io/Non-Euclidean-Game-Demo/
 
 ## Exposed Command line Variables
 In this project I left a lot of the code exposed to the global scope for debugging, but also because its just kind of fun to play arouynd with that stuff. To use this you can just open the browser console (f12) and type in commands.
