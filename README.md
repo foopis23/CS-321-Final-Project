@@ -57,8 +57,8 @@ controls.teleport(0, 600, 0, true, false, true)
 ### List of Exposed Variables
 ```
 scene : THREE.Scene
-rootElement: HtmlDOMElement
-canvasElement: HtmlCanvasElement
+rootElement : HtmlDOMElement
+canvasElement : HtmlCanvasElement
 renderer : THREE.WebGLRenderer
 camera : THREE.PerspectiveCamera
 controls : PlayerController (internal class)
